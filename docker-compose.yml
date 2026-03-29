@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  worldmonitor:
+    image: koala73/worldmonitor:latest
+    ports:
+      - "5173:5173"
+    environment:
+      - X_FRAME_OPTIONS=ALLOWALL
+
+  mirofish-api:
+    image: 666ghj/mirofish-api:latest
+    ports:
+      - "5001:5001"
+    environment:
+      - ZEP_API_KEY=${ZEP_API_KEY}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME}
+
+  mirofish-ui:
+    image: 666ghj/mirofish-ui:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - X_FRAME_OPTIONS=ALLOWALL
+      - API_URL=http://mirofish-api:5001
+
+  bridge:
+    build: ./bridge
+    ports:
+      - "4000:4000"
+    env_file: .env
+    environment:
+      - WM_URL=http://worldmonitor:5173
+      - MF_API_URL=http://mirofish-api:5001
+    depends_on:
+      - worldmonitor
+      - mirofish-api
+    volumes:
+      - bridge-data:/app/data
+
+  ui:
+    image: nginx:alpine
+    ports:
+      - "3333:80"
+    volumes:
+      - ./ui:/usr/share/nginx/html:ro
+    depends_on:
+      - bridge
+
+volumes:
+  bridge-data:

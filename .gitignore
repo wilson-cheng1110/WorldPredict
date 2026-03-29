@@ -1,0 +1,5 @@
+.env
+node_modules/
+bridge/data/
+bridge/mock-services.js
+*.log

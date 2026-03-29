@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Worldcast</title>
+<style>
+*{margin:0;box-sizing:border-box} body{font-family:system-ui,sans-serif;background:#0a0a0f;color:#e0e0e0;height:100vh;display:flex;flex-direction:column}
+.tabs{display:flex;background:#111;border-bottom:1px solid #222} .tabs button{flex:1;padding:10px;background:none;border:none;color:#888;cursor:pointer;font-size:14px} .tabs button.active{color:#fff;border-bottom:2px solid #4fc3f7}
+.tab-content{flex:1;display:none;overflow:auto} .tab-content.active{display:flex;flex-direction:column}
+iframe{width:100%;flex:1;border:none}
+#banner{display:none;padding:10px 16px;background:#1b5e20;color:#fff;font-size:14px;cursor:pointer;align-items:center;gap:8px} #banner.show{display:flex}
+.feed{padding:16px;display:flex;flex-direction:column;gap:12px}
+.card{background:#161620;border:1px solid #222;border-radius:8px;padding:14px} .card h3{font-size:15px;margin-bottom:4px} .card .meta{font-size:12px;color:#888;margin-bottom:8px}
+.card button,.rpt-link{padding:6px 14px;background:#1a237e;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;text-decoration:none;display:inline-block} .card button:hover,.rpt-link:hover{background:#283593}
+.progress{display:none;padding:16px} .progress.show{display:block} .progress .bar{height:6px;background:#222;border-radius:3px;overflow:hidden;margin:8px 0} .progress .bar div{height:100%;background:#4fc3f7;transition:width .3s}
+.report{display:none;padding:16px} .report.show{display:block} .report h2{font-size:16px;margin:12px 0 6px;color:#4fc3f7} .report ul{padding-left:20px;margin-bottom:8px} .report li{font-size:14px;margin:3px 0}
+.signals{margin-top:12px;background:#111;border-radius:8px;padding:12px} .signals h3{font-size:14px;margin-bottom:8px;color:#ffd54f} .sig-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px} .sig-row .dot{width:8px;height:8px;border-radius:50%;background:#555} .sig-row .dot.confirmed{background:#4caf50} .sig-row .expiry{color:#888;margin-left:auto;font-size:12px}
+.history{padding:16px} .history table{width:100%;border-collapse:collapse;font-size:13px} .history th,.history td{text-align:left;padding:8px;border-bottom:1px solid #222} .history th{color:#888} .status-watching{color:#4fc3f7} .status-confirmed{color:#4caf50} .status-expired{color:#666}
+.chat-row{display:flex;gap:8px;margin-top:12px} .chat-row input{flex:1;padding:8px;background:#111;border:1px solid #333;border-radius:4px;color:#e0e0e0;font-size:13px} .chat-row button{padding:8px 16px;background:#1a237e;color:#fff;border:none;border-radius:4px;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="banner" onclick="this.classList.remove('show')"><span id="banner-text"></span></div>
+<div class="tabs">
+  <button class="active" onclick="showTab('feed')">Feed</button>
+  <button onclick="showTab('globe')">Globe</button>
+  <button onclick="showTab('sim')">Simulation</button>
+  <button onclick="showTab('history')">History</button>
+</div>
+<div id="feed" class="tab-content active"><div class="feed" id="feed-list"></div><div class="progress" id="prog"><p id="prog-stage">Starting...</p><div class="bar"><div id="prog-bar" style="width:0%"></div></div></div><div class="report" id="rpt"></div></div>
+<div id="globe" class="tab-content"><iframe id="globe-frame"></iframe></div>
+<div id="sim" class="tab-content"><iframe id="sim-frame"></iframe></div>
+<div id="history" class="tab-content"><div class="history" id="hist"></div></div>
+<script>
+const BRIDGE = location.hostname === 'localhost' ? 'http://localhost:4000' : `http://${location.hostname}:4000`;
+const WM = 'http://localhost:5173';
+const MF = 'http://localhost:3000';
+let ws, currentSimId, currentEvent;
+
+function init() {
+  if ('Notification' in window) Notification.requestPermission();
+  document.getElementById('globe-frame').src = WM;
+  connectWS(); loadFeed(); loadHistory();
+}
+
+function connectWS() {
+  ws = new WebSocket(BRIDGE.replace('http', 'ws'));
+  ws.onmessage = (e) => handleWS(JSON.parse(e.data));
+  ws.onclose = () => setTimeout(connectWS, 3000);
+}
+
+function handleWS(msg) {
+  if (msg.type === 'progress') {
+    document.getElementById('prog').classList.add('show');
+    document.getElementById('prog-stage').textContent = msg.stage;
+    document.getElementById('prog-bar').style.width = msg.pct + '%';
+  } else if (msg.type === 'complete') {
+    document.getElementById('prog').classList.remove('show');
+    showReport(msg.report, msg.signals, msg.sim_id);
+  } else if (msg.type === 'error') {
+    document.getElementById('prog').classList.remove('show');
+    alert('Simulation failed: ' + msg.message);
+  } else if (msg.type === 'signal_confirmed') {
+    showBanner(msg);
+    if (Notification.permission === 'granted') new Notification('\uD83D\uDD14 Prediction confirmed', { body: msg.signal.text });
+    const dot = document.querySelector(`[data-sig="${msg.signal.id}"] .dot`);
+    if (dot) dot.classList.add('confirmed');
+    loadHistory();
+  }
+}
+
+async function loadFeed() {
+  try {
+    const res = await fetch(WM + '/api/events');
+    const events = await res.json();
+    const list = document.getElementById('feed-list');
+    list.innerHTML = '';
+    (Array.isArray(events) ? events : []).slice(0, 20).forEach((ev) => {
+      const d = document.createElement('div'); d.className = 'card';
+      const ago = ev.published_at ? timeAgo(ev.published_at) : '';
+      d.innerHTML = `<h3>${esc(ev.title)}</h3><div class="meta">${esc(ev.source||'')} · ${esc(ev.region||'')} · ${esc(ev.category||'')}${ago ? ' · '+ago : ''}</div><button onclick='predict(${JSON.stringify(ev).replace(/'/g,"&#39;")})'>Predict this event</button>`;
+      list.appendChild(d);
+    });
+  } catch { document.getElementById('feed-list').innerHTML = '<p style="padding:16px;color:#888">Could not load WorldMonitor feed. Is it running on :5173?</p>'; }
+}
+
+async function predict(event) {
+  currentEvent = event;
+  document.getElementById('rpt').classList.remove('show');
+  document.getElementById('prog').classList.add('show');
+  document.getElementById('prog-stage').textContent = 'Queuing simulation...';
+  document.getElementById('prog-bar').style.width = '2%';
+  try { await fetch(BRIDGE + '/predict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(event) }); }
+  catch (e) { alert('Bridge unreachable: ' + e.message); }
+}
+
+function showReport(report, signals, simId) {
+  currentSimId = simId;
+  document.getElementById('sim-frame').src = MF + '/sim/' + simId;
+  const r = document.getElementById('rpt');
+  let html = `<a class="rpt-link" href="${MF}/sim/${simId}" target="_blank">Open simulation in MiroFish</a>`;
+  html += '<h2>Markets</h2><ul>' + (report.markets||[]).map(b=>`<li>${esc(b)}</li>`).join('') + '</ul>';
+  html += '<h2>Geopolitics</h2><ul>' + (report.geopolitics||[]).map(b=>`<li>${esc(b)}</li>`).join('') + '</ul>';
+  html += '<h2>Supply Chain</h2><ul>' + (report.supply_chain||[]).map(b=>`<li>${esc(b)}</li>`).join('') + '</ul>';
+  html += '<div class="signals"><h3>Watch Signals</h3>';
+  (signals||[]).forEach((s) => {
+    html += `<div class="sig-row" data-sig="${s.id}"><span class="dot ${s.status==='confirmed'?'confirmed':''}"></span>${esc(s.text)}<span class="expiry">${s.timeframe_days}d</span></div>`;
+  });
+  html += '</div>';
+  html += `<div class="chat-row"><input id="followup" placeholder="Ask a what-if follow-up..." onkeydown="if(event.key==='Enter')sendFollowup()"><button onclick="sendFollowup()">Ask</button></div>`;
+  r.innerHTML = html; r.classList.add('show');
+}
+
+async function sendFollowup() {
+  const input = document.getElementById('followup');
+  const q = input.value.trim(); if (!q || !currentEvent) return;
+  input.value = '';
+  const ev = { ...currentEvent, title: currentEvent.title + ' [WHAT-IF: ' + q + ']', description: (currentEvent.description||'') + '\n\nFollow-up question: ' + q };
+  predict(ev);
+}
+
+function showBanner(msg) {
+  const b = document.getElementById('banner');
+  document.getElementById('banner-text').textContent = `Prediction confirmed: "${msg.signal.text}" \u2014 ${msg.matched_event.title}`;
+  b.classList.add('show');
+}
+
+async function loadHistory() {
+  try {
+    const res = await fetch(BRIDGE + '/history');
+    const all = await res.json();
+    const h = document.getElementById('hist');
+    if (!all.length) { h.innerHTML = '<p style="padding:16px;color:#888">No predictions yet.</p>'; return; }
+    let html = '<table><tr><th>Signal</th><th>Event</th><th>Status</th><th>Category</th><th></th></tr>';
+    all.forEach((s) => {
+      const link = s.sim_id ? `<a class="rpt-link" href="${MF}/sim/${s.sim_id}" target="_blank">View</a>` : '';
+      html += `<tr><td>${esc(s.text)}</td><td>${esc(s.wm_event_title||'')}</td><td class="status-${s.status}">${s.status}</td><td>${esc(s.category||'')}</td><td>${link}</td></tr>`;
+    });
+    h.innerHTML = html + '</table>';
+  } catch { document.getElementById('hist').innerHTML = '<p style="padding:16px;color:#888">Could not load history.</p>'; }
+}
+
+function showTab(id) {
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelector(`.tabs button[onclick*="${id}"]`).classList.add('active');
+  if (id === 'history') loadHistory();
+  if (id === 'feed') loadFeed();
+}
+
+function timeAgo(iso) {
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return s + 's ago'; if (s < 3600) return Math.floor(s/60) + 'm ago';
+  if (s < 86400) return Math.floor(s/3600) + 'h ago'; return Math.floor(s/86400) + 'd ago';
+}
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+init();
+</script>
+</body>
+</html>
