@@ -1,68 +1,62 @@
 # Roadmap
 
-## v1 — Mock mode (current)
+## v1 — Mock mode (current, shipped)
 
-What works today, end-to-end, with one `npm run quickstart`:
+End-to-end loop working with one `npm run quickstart`:
 
-- Bridge boots, exposes `POST /predict`, `GET /history`, `GET /signals`, and a WS.
-- UI renders the feed, predict flow, progress bar, report panel with watch signals, and history tab.
-- Mock WorldMonitor (3 sample events) and mock MiroFish API (returns a fixed semiconductor-tariff report after 8 s) make the full loop run without Docker.
-- Matcher polls every 60 s, scores incoming events against open signals via the configured LLM, fires WS notifications when score ≥ 0.8.
-- Test suite: unit (formatter, parsers, watchlist), MF-direct (mock-MF contract), and integration (live bridge + mocks + LLM).
+- Bridge: `POST /predict`, `GET /history`, `GET /signals`, WebSocket.
+- UI: feed, predict flow, progress bar, report panel with watch signals, history.
+- Mock WorldMonitor (3 sample events) and mock MiroFish API (3 category-keyed canned reports — disaster / finance / geopolitics — dispatched by seed keywords).
+- Matcher polls WM every 60 s, scores incoming events against open signals via the configured LLM, fires WS notifications when score ≥ 0.8.
+- Tests: unit (formatter, parsers, watchlist), MF-direct contract, integration (live bridge + mocks + LLM). All passing.
 
-Limitations of mock mode:
+Honest limitations:
 
-- The mock MF returns the same hard-coded report regardless of input seed — fine for validating the bridge, not for actually predicting anything.
-- The Globe and Simulation iframes are blank because the mocks have no UI.
-- Watch-signal matches use the real LLM, so the matcher results are meaningful even on mock data.
+- The three canned MF reports are realistic but fixed. Prediction quality is bounded by the mock; the matcher and summarizer use the real LLM so their behavior is meaningful.
+- Globe and Simulation iframes are blank in mock mode (the mocks have no UI).
+- Real-stack mode (against actual WM + MF Docker containers) is not yet a one-command experience — see v2.
 
-## v2 — Real-stack support (not yet a one-command experience)
+## v2 — Real-stack support
 
-The Docker images referenced in `docker-compose.yml` are not published on a public registry:
+Goal: `npm run quickstart:real` runs the bridge against actual WorldMonitor and MiroFish, not mocks.
 
-- `koala73/worldmonitor:latest` — does not exist on Docker Hub
-- `666ghj/mirofish-api:latest` — does not exist on Docker Hub
-- `666ghj/mirofish-ui:latest` — does not exist on Docker Hub
+### Blockers
 
-Until that changes, anyone running `docker compose up` from a fresh clone gets "image not found." Options to fix:
+The Docker images referenced in `docker-compose.yml` don't exist on Docker Hub (verified May 2026): `koala73/worldmonitor:latest`, `666ghj/mirofish-api:latest`, `666ghj/mirofish-ui:latest` all return 404. So `docker compose up` from a fresh clone fails. Three resolution paths:
 
-- Wait for the upstream projects to publish images
-- Push images of our own (requires AGPL compliance for redistributing upstream code, plus CI)
-- Switch `docker-compose.yml` to `build: ../worldmonitor` etc., with documentation telling users to clone both upstreams as siblings
+1. **Build from sibling clones** (most likely) — switch compose to `build: ../worldmonitor` and `build: ../MiroFish/backend`; document the clone-two-siblings step
+2. **Wait for upstreams to publish images** — passive, uncertain timeline
+3. **Republish under our own org** — requires AGPL compliance for redistribution and CI to keep them current
 
-The third is the most likely v2 path.
+### Concrete work items
 
-### Real WorldMonitor API surface
+- [ ] `mf-client.js`: implement the 7-step real workflow (ontology → graph → sim create → prepare → start → report generate → fetch). Step 1 works against any LLM; steps 2-7 require Zep Cloud.
+- [ ] Update `jobs.js` to drive the multi-step pipeline and emit a more granular `progress` WS (currently 4 stages; real flow has 7).
+- [ ] Enrich `formatter.js` seed for ontology step — real MF wants explicit entity/relation hints, not just narrative.
+- [ ] Replace WM `GET /api/events` polling. Real WM exposes 30+ specialized services; the matcher should aggregate `/api/news/v1/list-feed-digest` + `/api/intelligence/v1/list-cross-source-signals`, **or** move to the new WM MCP tools (Tier-1+2, 38 tools as of May 2026) and talk MCP instead of REST.
+- [ ] Update `docker-compose.yml` to use `build:` directives instead of broken `image:` refs.
+- [ ] Document the real-stack quickstart honestly: needs Docker, two sibling clones, a Zep Cloud key, and an LLM key. ~10 minutes of setup, not 2.
 
-WorldMonitor in practice does not expose a single `GET /api/events`. It has 30+ specialized services under `/api/news/v1/...`, `/api/conflict/v1/...`, `/api/intelligence/v1/...`. The matcher and feed loader will need to either:
+Files that **don't** need changes for v2: `watchlist.js`, `notifier.js`, `llm.js`, `summarizer.js`, `index.js` (interfaces stay the same).
 
-- Aggregate `/api/news/v1/list-feed-digest` + `/api/intelligence/v1/list-cross-source-signals`, or
-- Use the MCP tools WorldMonitor now exposes (Tier-1+2 coverage, 38 tools as of May 2026) and let the bridge talk to WM over MCP rather than REST
+Open questions for the WM and MF communities (drafted in `docs/community/`):
 
-Both options are open questions for the WM community.
+- WM: which endpoint(s) to aggregate, or jump straight to MCP?
+- MF: should `progress` WS expose the 7 internal stages, or stay abstracted? Any path to run MF without Zep?
 
-### Real MiroFish workflow
+## v3 — Stretch ideas
 
-MiroFish in practice is not a single `POST /api/simulate`. It's a 7-step async pipeline:
+Ranked by impact-per-effort once v2 lands:
 
-1. Generate ontology
-2. Build graph
-3. Create simulation
-4. Prepare agents
-5. Start simulation
-6. Generate report
-7. Get report
+| Idea | Effort | Impact |
+|---|---|---|
+| Prediction accuracy dashboard (hit rate over time, per category) | medium | high — gives the project a reason to come back daily |
+| Scheduled predictions (auto-predict top N events each morning) | small | medium |
+| Email or Telegram notification alternative to browser push | small | medium — browser push is unreliable in practice |
+| Multi-event simulation (seed MF with 2-3 simultaneous events) | medium | medium |
+| Exportable report (PDF / Markdown) | small | low |
+| What-if follow-up chat (perturbation question in the same sim context) | medium-large | unknown — depends on MF's design intent |
 
-Ontology generation runs against any LLM (Ollama tested working). Everything from step 2 onward requires a Zep Cloud API key.
+## Done
 
-Files in the bridge that will need updating for the real workflow: `jobs.js` (multi-step orchestration), `formatter.js` (richer seed for ontology step), and probably a new `mf-client.js` to keep the steps tidy. Files that should survive untouched: `watchlist.js`, `notifier.js`, `llm.js`, `summarizer.js`.
-
-## v3 — Ideas
-
-Stretch goals from the original TODO that are still open:
-
-- Email / Telegram notification alternative to browser push
-- Scheduled predictions: auto-predict top N events every morning
-- Prediction accuracy dashboard: hit rate over time across all signals
-- Multi-event simulation: seed MF with 2–3 simultaneous events
-- Exportable report (PDF / Markdown)
+- v1: mock-mode end-to-end loop, animated demo, full test suite, community standards (LICENSE, CODE_OF_CONDUCT, CONTRIBUTING, issue + PR templates), discovery topics on GitHub, draft posts for the two upstream communities.
