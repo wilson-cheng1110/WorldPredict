@@ -139,8 +139,8 @@ When a match fires:
 ### Install
 
 ```bash
-git clone https://github.com/you/worldcast
-cd worldcast
+git clone https://github.com/wilson-cheng1110/WorldPredict
+cd WorldPredict
 cp .env.example .env       # fill in your 3 API keys (5 min)
 docker compose up
 ```

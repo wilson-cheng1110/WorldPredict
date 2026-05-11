@@ -46,6 +46,7 @@ function init() {
 function connectWS() {
   ws = new WebSocket(BRIDGE.replace('http', 'ws'));
   ws.onmessage = (e) => handleWS(JSON.parse(e.data));
+  ws.onerror = () => ws.close();
   ws.onclose = () => setTimeout(connectWS, 3000);
 }
 
@@ -91,7 +92,7 @@ async function predict(event) {
   document.getElementById('prog-stage').textContent = 'Queuing simulation...';
   document.getElementById('prog-bar').style.width = '2%';
   try { await fetch(BRIDGE + '/predict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(event) }); }
-  catch (e) { alert('Bridge unreachable: ' + e.message); }
+  catch (e) { document.getElementById('prog').classList.remove('show'); alert('Bridge unreachable: ' + e.message); }
 }
 
 function showReport(report, signals, simId) {
