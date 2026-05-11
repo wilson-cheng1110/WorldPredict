@@ -1,0 +1,14 @@
+{
+  "name": "worldcast",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bridge WorldMonitor + MiroFish: pick a live event, simulate downstream effects, get notified when reality matches.",
+  "type": "module",
+  "scripts": {
+    "postinstall": "npm install --prefix bridge && npm install --prefix test",
+    "quickstart": "node scripts/quickstart.mjs",
+    "test": "node --test test/unit.test.js && node --test test/mf-direct.test.js",
+    "test:integration": "node --test test/integration.test.js"
+  },
+  "engines": { "node": ">=18" }
+}

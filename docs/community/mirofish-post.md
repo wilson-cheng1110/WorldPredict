@@ -15,7 +15,7 @@ Worldcast: feeding live WorldMonitor news events into MiroFish for "what happens
 
 ## Body (EN)
 
-Hi everyone — I've been experimenting with MiroFish for a few weeks and wanted to share a use case that I think shows off the engine nicely.
+Hi everyone — I built a small bridge tool that uses MiroFish, and wanted to share it here in case it's useful or the community has feedback.
 
 **Worldcast** is a thin bridge that takes any live news event from [WorldMonitor](https://github.com/koala73/worldmonitor) (real-time news/intelligence globe), formats it into a structured seed document, and pipes it straight into MiroFish's simulation workflow. The resulting agent simulation gets summarized into plain-English bullets across markets, geopolitics, and supply chain — plus a checklist of specific, verifiable watch signals.
 
@@ -63,7 +63,7 @@ Worldcast：把 WorldMonitor 的实时新闻喂给 MiroFish，做"接下来会�
 
 ## Body (ZH)
 
-大家好——我用 MiroFish 折腾了几周，想分享一个我觉得能展示这个引擎能力的用法。
+大家好——我做了一个基于 MiroFish 的小工具，发上来分享一下，看看是否对大家有用，也欢迎社区反馈。
 
 **Worldcast** 是一个很薄的桥接层。它把 [WorldMonitor](https://github.com/koala73/worldmonitor)（实时新闻/情报地球仪）上任何一条新闻事件，格式化成结构化的 seed 文档，直接喂进 MiroFish 的仿真流程。仿真结果会被总结成市场 / 地缘政治 / 供应链三个维度的简明 bullet，再加上一份具体、可验证的观察信号清单。
 

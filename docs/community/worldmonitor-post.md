@@ -13,7 +13,7 @@ Built a self-hosted bridge that turns WorldMonitor events into agent-based predi
 
 ## Body
 
-Hey folks — I've been using WorldMonitor as my daily situational-awareness dashboard for a while, and I wanted to share something I built on top of it.
+Hey folks — I built a small tool on top of WorldMonitor and wanted to share it here in case it's useful to anyone, or in case the maintainers / community have feedback.
 
 **Worldcast** is a small Node.js bridge that lets you click any event on the WM globe and ask: "what happens next?" It then:
 

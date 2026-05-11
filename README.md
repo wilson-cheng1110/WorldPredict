@@ -5,8 +5,8 @@
 Worldcast bridges two open-source projects — a real-time global intelligence dashboard and a multi-agent AI simulation engine — into a single tool that predicts the downstream effects of real-world events, then watches the news to tell you when those predictions actually happen.
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Docker](https://img.shields.io/badge/Docker-required-blue?logo=docker)](https://docker.com)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green?logo=node.js)](https://nodejs.org)
+[![Mock-mode quickstart](https://img.shields.io/badge/quickstart-2%20min-success)](#quick-start--see-it-running-in-2-minutes)
 
 ---
 
@@ -133,34 +133,53 @@ When a match fires:
 
 ---
 
-## Quick start
+## Quick start — see it running in 2 minutes
 
-### Prerequisites
+The fastest way to try Worldcast is **mock mode**: the bridge + UI talk to a local stub of WorldMonitor and MiroFish, so you don't need Docker, the real upstream images, a Zep Cloud account, or an LLM key beyond a local Ollama.
 
-| Tool | Version | Notes |
-|------|---------|-------|
-| Docker Desktop | latest | `docker --version` |
-| Node.js | 18+ | `node --version` |
-| LLM API key | — | [Alibaba Bailian](https://bailian.console.aliyun.com/) — qwen-plus, free tier |
-| Zep Cloud | free tier | [app.getzep.com](https://app.getzep.com) — agent memory |
-
-### Install
+**Requirements:** Node.js 18+ and (optionally) [Ollama](https://ollama.com) with any small model pulled (`ollama pull llama3`). If Ollama isn't running, predictions just return empty summaries — everything else still works.
 
 ```bash
 git clone https://github.com/wilson-cheng1110/WorldPredict
 cd WorldPredict
-cp .env.example .env       # fill in your 3 API keys (5 min)
-docker compose up
+cp .env.example .env            # default values are fine for mock mode
+npm install                      # installs bridge + test deps (~2 min)
+npm run quickstart               # boots mocks, bridge, UI all at once
 ```
 
-Open [localhost:3333](http://localhost:3333). Allow browser notifications when prompted.
+Open **<http://localhost:3333>**. You'll see three sample events. Click "Predict this event" on any of them — the progress bar runs through `queued → building world model → summarizing → complete`, then a report panel appears with Markets / Geopolitics / Supply Chain bullets and a checklist of watch signals.
 
-### Update
+To watch the notification loop fire, inject a confirming event into the mock WM:
 
 ```bash
-docker compose pull        # pulls latest WorldMonitor + MiroFish
-docker compose up -d       # restarts with new versions
+curl -X POST http://localhost:5173/inject -H "Content-Type: application/json" -d '{
+  "id":"wm_demo","title":"Confirming event matches your signal",
+  "description":"...","source":"Demo","published_at":"2026-05-11T00:00:00Z",
+  "region":"TEST","category":"markets","url":"https://example.com"
+}'
 ```
+
+Within 60 seconds the matcher cycle picks it up and you get a browser notification.
+
+Ctrl-C in the quickstart terminal tears everything down.
+
+### Tests
+
+```bash
+npm test                    # unit tests + MF-direct tests (fast, <10s)
+npm run test:integration    # full loop against the running mock stack
+```
+
+### Real-stack mode (advanced)
+
+Running against the actual WorldMonitor and MiroFish containers is **not yet a one-command experience**. The Docker images aren't published on a public registry, so you'd need to:
+
+1. Clone [koala73/worldmonitor](https://github.com/koala73/worldmonitor) and [666ghj/MiroFish](https://github.com/666ghj/MiroFish) as siblings of this repo and build them locally
+2. Get a free [Zep Cloud](https://app.getzep.com) API key (MiroFish requires it for graph + simulation steps)
+3. Adjust `docker-compose.yml` to `build: ../worldmonitor` / `build: ../MiroFish/backend` instead of `image:`
+4. Get an LLM key — [Alibaba Bailian](https://bailian.console.aliyun.com/) qwen-plus is free tier; OpenAI also works
+
+See [ROADMAP.md](ROADMAP.md) for the state of real-stack support.
 
 ---
 
@@ -191,8 +210,11 @@ SIGNAL_DEFAULT_EXPIRY_DAYS=90
 
 ```
 worldcast/
-├── docker-compose.yml       one command boots everything
+├── package.json             root npm scripts (quickstart, test)
+├── docker-compose.yml       real-stack composition (see ROADMAP.md)
 ├── .env.example             all keys documented
+├── scripts/
+│   └── quickstart.mjs       boots mocks + bridge + UI in one process
 ├── bridge/
 │   ├── index.js             Express + WebSocket server
 │   ├── formatter.js         WM event → MF seed document
@@ -203,8 +225,14 @@ worldcast/
 │   └── notifier.js          push WS alerts to UI clients
 ├── ui/
 │   └── index.html           all 4 tabs + notification UI
+├── test/
+│   ├── mock-services.js     stub WorldMonitor + MiroFish
+│   ├── unit.test.js         node:test, pure-function coverage
+│   ├── mf-direct.test.js    contract test against mock MF
+│   └── integration.test.js  POST /predict → WS → signal_confirmed
 └── docs/
-    └── index.html           GitHub Pages landing page
+    ├── index.html           GitHub Pages landing page
+    └── screenshots/         README assets
 ```
 
 ---
@@ -215,69 +243,6 @@ worldcast/
 - Simulation quality scales with seed richness. Sparse events → weaker simulations.
 - Each simulation takes 5–15 min and consumes significant LLM tokens. Start with <40 rounds.
 - The matcher uses semantic similarity, not fact verification. A matching headline signals confirmation — human judgement still needed.
-
----
-
-## What to do next (resume checklist)
-
-The bridge code is built but needs a rewrite to match the **real** APIs discovered during testing. Here's what's blocking and what to do:
-
-### 1. Restart your machine
-Docker Desktop was just installed via `winget` but needs a reboot to enable WSL2/Hyper-V.
-
-### 2. Get a Zep Cloud API key (free)
-- Sign up at [app.getzep.com](https://app.getzep.com)
-- Copy your API key
-- Paste it into `.env` as `ZEP_API_KEY=your_real_key`
-- MiroFish's graph building, simulation, and reports all require Zep Cloud (confirmed: 401 without it)
-
-### 3. After reboot: start Docker Desktop and run WorldMonitor
-```bash
-cd ../worldmonitor
-cp .env.example .env.local    # optionally add GROQ_API_KEY for AI summaries
-docker compose up -d --build
-# Then seed data:
-./scripts/run-seeders.sh
-```
-WorldMonitor's API only works with the full Docker stack (Redis + API server).
-
-### 4. Rewrite the bridge for real APIs
-The CLAUDE.md assumed simple `POST /api/simulate` + `GET /api/events` but reality is:
-
-**MiroFish** (confirmed by testing):
-- 7-step async workflow: ontology generate -> graph build -> sim create -> prepare -> start -> report generate -> get report
-- Ontology generation works with Ollama/llama3 (tested successfully)
-- All steps after ontology require Zep Cloud
-
-**WorldMonitor**:
-- No `GET /api/events` endpoint — has 30+ specialized services (`/api/news/v1/...`, `/api/conflict/v1/...`, etc.)
-- Matcher needs to aggregate from `/api/news/v1/list-feed-digest` and `/api/intelligence/v1/list-cross-source-signals`
-
-Files that need rewriting: `formatter.js`, `jobs.js` (+ new `mf-client.js`), `matcher.js`.
-Files that are fine: `watchlist.js`, `notifier.js`, `llm.js`, `summarizer.js` (minor prompt tweak).
-
-### 5. Test end-to-end
-```bash
-# MiroFish (runs natively, no Docker needed)
-cd ../MiroFish/backend && python run.py
-
-# Bridge
-cd bridge && node --env-file=../.env index.js
-
-# UI (or use any static server on :3333)
-# open ui/index.html
-```
-
-### Current working state
-| Component | Status |
-|-----------|--------|
-| Bridge skeleton (all 7 modules) | Built, needs API rewrite |
-| UI (single HTML, 4 tabs, WS, notifications) | Built, functional |
-| docker-compose.yml | Built |
-| MiroFish backend | Tested running on Python 3.11 + Ollama |
-| WorldMonitor | Cloned, needs Docker for API |
-| Docker Desktop | Installed, needs reboot |
-| Zep Cloud | **MISSING** - need free API key |
 
 ---
 
