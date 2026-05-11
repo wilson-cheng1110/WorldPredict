@@ -10,11 +10,11 @@ Worldcast bridges two open-source projects — a real-time global intelligence d
 
 ---
 
-## Screenshots
+## Demo
 
-| Live feed | Prediction in progress | Report + watch signals | History |
-|---|---|---|---|
-| ![Feed tab](docs/screenshots/feed-tab.png) | ![Prediction running](docs/screenshots/predict-clicked.png) | ![Report panel](docs/screenshots/feed-with-report.png) | ![History tab](docs/screenshots/history-tab.png) |
+![Worldcast demo loop: pick a Turkey earthquake event, watch the prediction render, then see a confirming news item flip the watch signal green](docs/worldcast-demo.gif)
+
+The full loop: pick a live event → simulated prediction renders with markets / geopolitics / supply-chain bullets and watch signals → an incoming news event confirms one of those signals and a banner appears at the top. Runs against the included mocks, no Docker required — [try it in 2 minutes ↓](#quick-start--see-it-running-in-2-minutes).
 
 ---
 
