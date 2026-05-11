@@ -44,7 +44,7 @@ async function scoreWithRetry(signalText, eventText) {
   return parseScore(retry) || { score: 0, reasoning: 'parse error' };
 }
 
-function parseScore(raw) {
+export function parseScore(raw) {
   const cleaned = raw.replace(/```json?\n?/g, '').replace(/```/g, '');
   const start = cleaned.indexOf('{');
   const end = cleaned.lastIndexOf('}');

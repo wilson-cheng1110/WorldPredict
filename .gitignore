@@ -3,3 +3,12 @@ node_modules/
 bridge/data/
 *.log
 files*.zip
+
+# Local Playwright artifacts (test screenshots, traces)
+.playwright-mcp/
+/feed-tab.png
+/feed-with-report.png
+/history-tab.png
+/predict-clicked.png
+/report-rendered.png
+

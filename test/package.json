@@ -1,0 +1,12 @@
+{
+  "name": "worldcast-test",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "mock": "node mock-services.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.20.0"
+  }
+}

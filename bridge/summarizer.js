@@ -48,7 +48,7 @@ async function callAndParse(prompt) {
   return parsed || FALLBACK;
 }
 
-function parseJSON(raw) {
+export function parseJSON(raw) {
   const cleaned = raw.replace(/```json?\n?/g, '').replace(/```/g, '');
   const start = cleaned.indexOf('{');
   const end = cleaned.lastIndexOf('}');
