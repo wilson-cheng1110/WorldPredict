@@ -4,11 +4,6 @@ bridge/data/
 *.log
 files*.zip
 
-# Local Playwright artifacts (test screenshots, traces)
+# Local Playwright artifacts (ad-hoc screenshots, traces)
 .playwright-mcp/
-/feed-tab.png
-/feed-with-report.png
-/history-tab.png
-/predict-clicked.png
-/report-rendered.png
 

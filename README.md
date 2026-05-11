@@ -10,6 +10,14 @@ Worldcast bridges two open-source projects — a real-time global intelligence d
 
 ---
 
+## Screenshots
+
+| Live feed | Prediction in progress | Report + watch signals | History |
+|---|---|---|---|
+| ![Feed tab](docs/screenshots/feed-tab.png) | ![Prediction running](docs/screenshots/predict-clicked.png) | ![Report panel](docs/screenshots/feed-with-report.png) | ![History tab](docs/screenshots/history-tab.png) |
+
+---
+
 ## What it does
 
 1. **Monitor** — WorldMonitor aggregates 435+ live news feeds, geopolitical signals, and financial data onto a real-time 3D globe
