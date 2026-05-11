@@ -41,11 +41,17 @@ async function callAndParse(prompt) {
   const raw = await llmCall(prompt);
   const result = parseJSON(raw);
   if (result) return result;
+  console.warn('[summarizer] first parse failed, retrying. Raw:', raw.slice(0, 200));
   const retry = await llmCall(prompt);
-  return parseJSON(retry) || FALLBACK;
+  const parsed = parseJSON(retry);
+  if (!parsed) console.warn('[summarizer] retry also failed, using fallback. Raw:', retry.slice(0, 200));
+  return parsed || FALLBACK;
 }
 
 function parseJSON(raw) {
-  try { return JSON.parse(raw.replace(/```json?\n?/g, '').replace(/```/g, '').trim()); }
-  catch { return null; }
+  const cleaned = raw.replace(/```json?\n?/g, '').replace(/```/g, '');
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start === -1 || end === -1) return null;
+  try { return JSON.parse(cleaned.slice(start, end + 1)); } catch { return null; }
 }

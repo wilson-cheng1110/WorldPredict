@@ -45,6 +45,9 @@ async function scoreWithRetry(signalText, eventText) {
 }
 
 function parseScore(raw) {
-  try { return JSON.parse(raw.replace(/```json?\n?/g, '').replace(/```/g, '').trim()); }
-  catch { return null; }
+  const cleaned = raw.replace(/```json?\n?/g, '').replace(/```/g, '');
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start === -1 || end === -1) return null;
+  try { return JSON.parse(cleaned.slice(start, end + 1)); } catch { return null; }
 }
